@@ -15,13 +15,20 @@ const (
 	height = 8
 )
 
+type Vector2 struct {
+	x int
+	y int
+}
+
 type model struct {
-	grid Grid
+	cursor Vector2
+	grid   Grid
 }
 
 func initialModel() model {
 	return model{
-		grid: NewGrid(width, height, 0xFF),
+		cursor: Vector2{x: 0, y: 0},
+		grid:   NewGrid(width, height, 0x00),
 	}
 }
 
@@ -33,13 +40,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-
 		case "r":
-			x := rand.IntN(m.grid.Width())
-			y := rand.IntN(m.grid.Height())
-			dot := rand.IntN(7)
+			dwidth := m.grid.DotWidth()
+			dheight := m.grid.DotHeight()
 
-			m.grid.ToggleDot(x, y, dot)
+			dotx := rand.IntN(dwidth)
+			doty := rand.IntN(dheight)
+
+			m.grid.ToggleDotAt(dotx, doty)
+
+		case "up":
+			m.cursor.y--
+		case "down":
+			m.cursor.y++
+		case "left":
+			m.cursor.x--
+		case "right":
+			m.cursor.x++
+
+		case " ":
+			m.grid.ToggleDotAt(m.cursor.x, m.cursor.y)
 
 		case "q", "ctrl+c":
 			return m, tea.Quit
