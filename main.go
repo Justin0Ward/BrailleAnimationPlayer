@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	width  = 50
-	height = 25
+	width  = 32 / 2
+	height = 32 / 4
 )
 
 var (
@@ -35,12 +35,14 @@ type Vector2 struct {
 
 type model struct {
 	cursor Vector2
+	frame  int
 	grid   Grid
 }
 
 func initialModel() model {
 	return model{
 		cursor: Vector2{x: 0, y: 0},
+		frame:  1,
 		grid:   NewGrid(width, height, 0x00),
 	}
 }
@@ -63,8 +65,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.grid.ToggleDotAt(dotx, doty)
 
 		case "d":
-			img := ParseImage(testImage, 16, 16)
+			frameCountStr := strconv.Itoa(m.frame)
+			file := ReadImgFromFile("frames/" + frameCountStr + ".brlimg")
+
+			img := ParseImage(file, 32, 32)
 			m.grid.DrawImage(img)
+
+			if m.frame < 3 {
+				m.frame++
+			}
+
+		case "f":
+			m.grid = NewGrid(32/2, 32/4, 0xFF)
 
 		case "up":
 			m.cursor.y--
@@ -88,6 +100,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	curStr := "cursor: " + strconv.Itoa(m.cursor.x) + "," + strconv.Itoa(m.cursor.y)
+	curStr += " frame: " + strconv.Itoa(m.frame)
 	controls := "Press q to quit"
 	display := RenderGrid(&m.grid)
 
