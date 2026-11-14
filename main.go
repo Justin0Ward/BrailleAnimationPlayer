@@ -6,13 +6,26 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"os"
+	"strconv"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
-	width  = 16
-	height = 8
+	width  = 50
+	height = 25
+)
+
+var (
+	controlStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			Padding(1, 2).
+			Width(25)
+
+	displayStyle = lipgloss.NewStyle().
+			Border(lipgloss.ThickBorder()).
+			Padding(0)
 )
 
 type Vector2 struct {
@@ -49,6 +62,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.grid.ToggleDotAt(dotx, doty)
 
+		case "d":
+			img := ParseImage(testImage, 16, 16)
+			m.grid.DrawImage(img)
+
 		case "up":
 			m.cursor.y--
 		case "down":
@@ -59,7 +76,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor.x++
 
 		case " ":
-			m.grid.ToggleDotAt(m.cursor.x, m.cursor.y)
+			m.grid.SetDotAt(m.cursor.x, m.cursor.y, true)
 
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -70,7 +87,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return RenderGrid(&m.grid) + "\nPress q to quit"
+	curStr := "cursor: " + strconv.Itoa(m.cursor.x) + "," + strconv.Itoa(m.cursor.y)
+	controls := "Press q to quit"
+	display := RenderGrid(&m.grid)
+
+	menu := lipgloss.JoinVertical(
+		lipgloss.Top,
+		controlStyle.Render(curStr),
+		controlStyle.Render(controls),
+	)
+
+	return lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		displayStyle.Render(display),
+		menu,
+	)
 }
 
 func main() {

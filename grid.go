@@ -26,32 +26,22 @@ func (g *Grid) At(x, y int) uint8 {
 }
 
 // Set the value of a Braille cell.
-func (g *Grid) Set(x, y int, value uint8) {
+func (g *Grid) set(x, y int, value uint8) {
 	g.cells[y*g.width+x] = value
 }
 
 // Toggle an individual Braille dot within a cell.
 // Dot index ranges from 0 to 7.
-func (g *Grid) ToggleDot(x, y, dot int) {
+func (g *Grid) toggleDot(x, y, dot int) {
 	g.cells[y*g.width+x] ^= 1 << dot
 }
 
-func (g *Grid) SetDot(x, y, dot int, value bool) {
+func (g *Grid) setDot(x, y, dot int, value bool) {
 	if value {
 		g.cells[y*g.width+x] |= 1 << dot
 	} else {
 		g.cells[y*g.width+x] &^= 1 << dot
 	}
-}
-
-// DotWidth returns the width of the grid measured in individual Braille dots.
-func (g *Grid) DotWidth() int {
-	return g.width * 2
-}
-
-// DotHeight returns the height of the grid measured in individual Braille dots.
-func (g *Grid) DotHeight() int {
-	return g.height * 4
 }
 
 // dotLocation converts coordinates in the full dot field into a Braille
@@ -100,7 +90,7 @@ func (g *Grid) SetDotAt(x, y int, value bool) bool {
 		return false
 	}
 
-	g.SetDot(cellX, cellY, dot, value)
+	g.setDot(cellX, cellY, dot, value)
 
 	return true
 }
@@ -113,8 +103,18 @@ func (g *Grid) ToggleDotAt(x, y int) bool {
 		return false
 	}
 
-	g.ToggleDot(cellX, cellY, dot)
+	g.toggleDot(cellX, cellY, dot)
 	return true
+}
+
+// DotWidth returns the width of the grid measured in individual Braille dots.
+func (g *Grid) DotWidth() int {
+	return g.width * 2
+}
+
+// DotHeight returns the height of the grid measured in individual Braille dots.
+func (g *Grid) DotHeight() int {
+	return g.height * 4
 }
 
 func (g *Grid) Width() int {
@@ -123,4 +123,19 @@ func (g *Grid) Width() int {
 
 func (g *Grid) Height() int {
 	return g.height
+}
+
+func (g *Grid) DrawImage(img Image) {
+	for y := 0; y < img.height; y++ {
+		for x := 0; x < img.width; x++ {
+			value := false
+			switch img.pixels[y*img.width+x] {
+			case 1:
+				value = true
+			case 0:
+				value = false
+			}
+			g.SetDotAt(x, y, value)
+		}
+	}
 }
