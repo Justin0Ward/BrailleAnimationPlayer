@@ -85,6 +85,8 @@ func (m *model) LoadAllFrames() {
 		return
 	}
 
+	m.loadedFrames = []Image{}
+
 	for f := range m.files {
 		file := ReadImgFromFile(m.files[f])
 		img := ParseImage(file)
