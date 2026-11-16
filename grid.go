@@ -1,3 +1,6 @@
+//Braille Animation Player
+// by Justin Ward w/ ChatGPT
+
 package main
 
 type Grid struct {

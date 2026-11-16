@@ -1,4 +1,4 @@
-module brailanimation
+module brailleanimation
 
 go 1.24.3
 

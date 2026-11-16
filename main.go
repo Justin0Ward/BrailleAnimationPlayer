@@ -1,4 +1,5 @@
-// Its Braille not Brail
+//Braille Animation Player
+// by Justin Ward w/ ChatGPT
 
 package main
 
