@@ -45,8 +45,9 @@ type model struct {
 	grid  Grid
 	frame int
 
-	directory string
-	files     []string
+	directory    string
+	files        []string
+	loadedFrames []Image
 
 	picker    filepicker.Model
 	selecting bool
@@ -61,8 +62,10 @@ func initialModel() model {
 	fp := filepicker.New()
 
 	fp.DirAllowed = true
-	fp.FileAllowed = false
+	fp.FileAllowed = true
+	fp.ShowSize = false
 	fp.CurrentDirectory, _ = os.Getwd()
+	fp.SetHeight(12)
 
 	return model{
 		frame:     0,
@@ -77,16 +80,24 @@ func (m model) Init() tea.Cmd {
 	return m.picker.Init()
 }
 
-func (m *model) LoadFrame() {
+func (m *model) LoadAllFrames() {
 	if len(m.files) == 0 {
 		return
 	}
 
-	file := ReadImgFromFile(m.files[m.frame])
-	img := ParseImage(file)
+	for f := range m.files {
+		file := ReadImgFromFile(m.files[f])
+		img := ParseImage(file)
+		m.loadedFrames = append(m.loadedFrames, img)
+	}
+}
 
-	m.grid = NewGrid(width, height, 0x00)
-	m.grid.DrawImage(img)
+func (m *model) LoadFrame() {
+	if len(m.loadedFrames) == 0 {
+		return
+	}
+
+	m.grid.DrawImage(m.loadedFrames[m.frame])
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -109,6 +120,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Did we select a directory?
 		if didSelect, path := m.picker.DidSelectFile(msg); didSelect {
+			info, err := os.Stat(path)
+			if err != nil {
+				m.error = err.Error()
+				return m, cmd
+			}
+
+			if !info.IsDir() {
+				m.error = "Please select a directory, not a file"
+				return m, cmd
+			}
+
 			files, err := LoadDirectory(path)
 			if err != nil {
 				m.error = err.Error()
@@ -125,7 +147,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.frame = 0
 			m.playing = false
 			m.playbackID++
+			m.error = ""
 
+			m.LoadAllFrames()
 			m.LoadFrame()
 			m.selecting = false
 		}
@@ -165,6 +189,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "o":
 			m.playing = false
 			m.playbackID++
+
+			fp := filepicker.New()
+			fp.DirAllowed = true
+			fp.FileAllowed = true
+			fp.ShowSize = false
+			fp.SetHeight(12)
+
+			fp.CurrentDirectory, _ = os.Getwd()
+
+			m.picker = fp
+			m.error = ""
 			m.selecting = true
 
 			return m, m.picker.Init()
@@ -202,6 +237,8 @@ func (m model) View() string {
 		return lipgloss.JoinVertical(
 			lipgloss.Left,
 			"Choose an animation directory:",
+			"Current directory: "+m.picker.CurrentDirectory,
+			"",
 			m.picker.View(),
 			"Press esc to cancel",
 			m.error,
