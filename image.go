@@ -38,7 +38,7 @@ func LoadDirectory(path string) ([]string, error) {
 			continue
 		}
 
-		if strings.HasSuffix(entry.Name(), ".txt") {
+		if strings.EqualFold(filepath.Ext(entry.Name()), ".txt") {
 			files = append(files, filepath.Join(path, entry.Name()))
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/charmbracelet/bubbles/filepicker"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -30,87 +31,159 @@ var (
 			Foreground(lipgloss.Color("118"))
 )
 
-type tickMsg time.Time
+type tickMsg struct {
+	id uint64
+}
 
-func tick() tea.Cmd {
+func tick(id uint64) tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-		return tickMsg(t)
+		return tickMsg{id: id}
 	})
 }
 
 type model struct {
-	grid      Grid
-	frame     int
+	grid  Grid
+	frame int
+
 	directory string
 	files     []string
-	playing   bool
+
+	picker    filepicker.Model
+	selecting bool
+
+	playing    bool
+	playbackID uint64
+
+	error string
 }
 
 func initialModel() model {
+	fp := filepicker.New()
+
+	fp.DirAllowed = true
+	fp.FileAllowed = false
+	fp.CurrentDirectory, _ = os.Getwd()
+
 	return model{
-		grid:    NewGrid(width, height, 0x00),
-		playing: false,
+		frame:     0,
+		grid:      NewGrid(width, height, 0x00),
+		picker:    fp,
+		selecting: false,
+		playing:   false,
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return m.picker.Init()
+}
+
+func (m *model) LoadFrame() {
+	if len(m.files) == 0 {
+		return
+	}
+
+	file := ReadImgFromFile(m.files[m.frame])
+	img := ParseImage(file)
+
+	m.grid = NewGrid(width, height, 0x00)
+	m.grid.DrawImage(img)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+
+	// Handle filepicker separately when selecting
+	if m.selecting {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				m.selecting = false
+				return m, nil
+			case "ctrl+c":
+				return m, tea.Quit
+			}
+		}
+
+		var cmd tea.Cmd
+		m.picker, cmd = m.picker.Update(msg)
+
+		// Did we select a directory?
+		if didSelect, path := m.picker.DidSelectFile(msg); didSelect {
+			files, err := LoadDirectory(path)
+			if err != nil {
+				m.error = err.Error()
+				return m, cmd
+			}
+
+			if len(files) == 0 {
+				m.error = "No .txt frames found in directory"
+				return m, cmd
+			}
+
+			m.files = files
+			m.directory = path
+			m.frame = 0
+			m.playing = false
+			m.playbackID++
+
+			m.LoadFrame()
+			m.selecting = false
+		}
+
+		return m, cmd
+	}
+
+	// Normal application controls
 	switch msg := msg.(type) {
 	case tickMsg:
-		if !m.playing || len(m.files) == 0 {
+		// Ignore outdated timers
+		if msg.id != m.playbackID || !m.playing {
 			return m, nil
 		}
 
-		m.frame = (m.frame + 1) % len(m.files)
+		// Advance to next frame
+		if len(m.files) > 0 {
+			m.frame = (m.frame + 1) % len(m.files)
+			m.LoadFrame()
+		}
 
-		file := ReadImgFromFile(m.files[m.frame])
-		img := ParseImage(file)
-		m.grid = NewGrid(width, height, 0x00)
-		m.grid.DrawImage(img)
-
-		return m, tick()
-
+		// Schedule the next tick
+		return m, tick(msg.id)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case " ":
+			if len(m.files) == 0 {
+				break
+			}
+
 			m.playing = !m.playing
+			m.playbackID++
 
 			if m.playing {
-				return m, tick()
+				return m, tick(m.playbackID)
+			}
+		case "o":
+			m.playing = false
+			m.playbackID++
+			m.selecting = true
+
+			return m, m.picker.Init()
+
+		case "right":
+			if len(m.files) > 0 {
+				m.frame = (m.frame + 1) % len(m.files)
+				m.LoadFrame()
 			}
 
-		case "t":
-			files, err := LoadDirectory("frames/spin")
-			if err != nil {
-				return m, nil
+		case "left":
+			if len(m.files) > 0 {
+				m.frame = (m.frame - 1 + len(m.files)) % len(m.files)
+				m.LoadFrame()
 			}
-
-			m.directory = "frames/spin"
-			m.files = files
-			m.frame = 0
-
-			file := ReadImgFromFile(m.files[m.frame])
-			img := ParseImage(file)
-			m.grid.DrawImage(img)
 
 		case "r":
 			m.frame = 0
-
-		case "right":
-			frameCountStr := strconv.Itoa(m.frame + 1)
-			file := ReadImgFromFile("frames/spin/frame_00" + frameCountStr + ".txt")
-
-			img := ParseImage(file)
-			m.grid.DrawImage(img)
-
-			if m.frame < 5 {
-				m.frame++
-			} else if m.frame >= 5 {
-				m.frame = 0
-			}
+			m.LoadFrame()
 
 		case "c":
 			m.grid = NewGrid(width, height, 0x00)
@@ -124,10 +197,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	controls := "Press -> for next frame\n" +
-		"Press c to clear display\n" +
-		"Press r to set frame to first\n" +
-		"Press q to quit"
+
+	if m.selecting {
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			"Choose an animation directory:",
+			m.picker.View(),
+			"Press esc to cancel",
+			m.error,
+		)
+	}
+
+	playStatus := "Paused"
+
+	if m.playing {
+		playStatus = "Playing"
+	}
+
+	controls := "o      Open directory\n" +
+		"space  Play / Pause\n" +
+		"← →    Previous / Next frame\n" +
+		"r      Restart animation\n" +
+		"c      Clear display\n" +
+		"q      Quit\n\n" +
+		"Status: " + playStatus +
+		"\nFrames: " + strconv.Itoa(len(m.files)) +
+		"\nFrame: " + strconv.Itoa(m.frame+1)
+
+	if m.directory != "" {
+		controls += "\n\nDirectory: " + m.directory
+	}
+
+	if m.error != "" {
+		controls += "\n\nError: " + m.error
+	}
+
 	display := RenderGrid(&m.grid)
 
 	menu := lipgloss.JoinVertical(
