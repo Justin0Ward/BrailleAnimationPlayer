@@ -45,7 +45,22 @@ func OldParseImage(data string, width, height int) Image {
 	return img
 }
 
-func ParseImage(data string, width, height int) Image {
+func ParseImage(data string) Image {
+	// Find the end of the first line
+	lineEnd := strings.Index(data, "\n")
+
+	// Extract the first line
+	firstLine := data[:lineEnd]
+
+	// Split into two values
+	dimensions := strings.Fields(firstLine)
+
+	width, _ := strconv.Atoi(dimensions[0])
+	height, _ := strconv.Atoi(dimensions[1])
+
+	// Remove the first line from the original string
+	data = data[lineEnd+1:]
+
 	data = strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
 			return -1

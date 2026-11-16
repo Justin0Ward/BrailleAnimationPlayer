@@ -20,29 +20,24 @@ var (
 	controlStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			Padding(1, 2).
-			Width(25)
+			Width(35).
+			Foreground(lipgloss.Color("118"))
 
 	displayStyle = lipgloss.NewStyle().
 			Border(lipgloss.ThickBorder()).
-			Padding(0)
+			Padding(0).
+			Foreground(lipgloss.Color("118"))
 )
 
-type Vector2 struct {
-	x int
-	y int
-}
-
 type model struct {
-	cursor Vector2
-	frame  int
-	grid   Grid
+	frame int
+	grid  Grid
 }
 
 func initialModel() model {
 	return model{
-		cursor: Vector2{x: 0, y: 0},
-		frame:  1,
-		grid:   NewGrid(width, height, 0x00),
+		frame: 1,
+		grid:  NewGrid(width, height, 0x00),
 	}
 }
 
@@ -57,11 +52,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			m.frame = 1
 
-		case "d":
+		case "right":
 			frameCountStr := strconv.Itoa(m.frame)
 			file := ReadImgFromFile("frames/spin/frame_00" + frameCountStr + ".txt")
 
-			img := ParseImage(file, 32, 32)
+			img := ParseImage(file)
 			m.grid.DrawImage(img)
 
 			if m.frame < 6 {
@@ -70,20 +65,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.frame = 1
 			}
 
-		case "f":
-			m.grid = NewGrid(32/2, 32/4, 0xFF)
-
-		case "up":
-			m.cursor.y--
-		case "down":
-			m.cursor.y++
-		case "left":
-			m.cursor.x--
-		case "right":
-			m.cursor.x++
-
-		case " ":
-			m.grid.SetDotAt(m.cursor.x, m.cursor.y, true)
+		case "c":
+			m.grid = NewGrid(width, height, 0x00)
 
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -94,14 +77,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	curStr := "cursor: " + strconv.Itoa(m.cursor.x) + "," + strconv.Itoa(m.cursor.y)
-	curStr += " frame: " + strconv.Itoa(m.frame)
-	controls := "Press q to quit"
+	controls := "Press -> for next frame\n" +
+		"Press c to clear display\n" +
+		"Press r to set frame to first\n" +
+		"Press q to quit"
 	display := RenderGrid(&m.grid)
 
 	menu := lipgloss.JoinVertical(
 		lipgloss.Top,
-		controlStyle.Render(curStr),
 		controlStyle.Render(controls),
 	)
 
