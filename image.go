@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 type Image struct {
@@ -23,7 +24,7 @@ func ReadImgFromFile(file string) string {
 	return string(data)
 }
 
-func ParseImage(data string, width, height int) Image {
+func OldParseImage(data string, width, height int) Image {
 	fields := strings.Fields(data)
 
 	img := Image{
@@ -39,6 +40,36 @@ func ParseImage(data string, width, height int) Image {
 		}
 
 		img.pixels[i] = uint8(n)
+	}
+
+	return img
+}
+
+func ParseImage(data string, width, height int) Image {
+	data = strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, data)
+
+	if len(data) != width*height {
+		fmt.Printf("Length: %d (expected %d)\n", len(data), width*height)
+		panic("incorrect image data length")
+	}
+
+	img := Image{
+		width:  width,
+		height: height,
+		pixels: make([]uint8, len(data)),
+	}
+
+	for i := 0; i < len(data); i++ {
+		if data[i] != '0' && data[i] != '1' {
+			panic(fmt.Sprintf("invalid pixel at position %d: %q", i, data[i]))
+		}
+
+		img.pixels[i] = data[i] - '0'
 	}
 
 	return img

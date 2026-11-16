@@ -4,7 +4,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"strconv"
 
@@ -56,23 +55,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "r":
-			dwidth := m.grid.DotWidth()
-			dheight := m.grid.DotHeight()
-
-			dotx := rand.IntN(dwidth)
-			doty := rand.IntN(dheight)
-
-			m.grid.ToggleDotAt(dotx, doty)
+			m.frame = 1
 
 		case "d":
 			frameCountStr := strconv.Itoa(m.frame)
-			file := ReadImgFromFile("frames/" + frameCountStr + ".brlimg")
+			file := ReadImgFromFile("frames/spin/frame_00" + frameCountStr + ".txt")
 
 			img := ParseImage(file, 32, 32)
 			m.grid.DrawImage(img)
 
-			if m.frame < 3 {
+			if m.frame < 6 {
 				m.frame++
+			} else if m.frame >= 6 {
+				m.frame = 1
 			}
 
 		case "f":
