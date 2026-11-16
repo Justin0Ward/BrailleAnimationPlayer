@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -29,15 +30,26 @@ var (
 			Foreground(lipgloss.Color("118"))
 )
 
+type tickMsg time.Time
+
+func tick() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
 type model struct {
-	frame int
-	grid  Grid
+	grid      Grid
+	frame     int
+	directory string
+	files     []string
+	playing   bool
 }
 
 func initialModel() model {
 	return model{
-		frame: 1,
-		grid:  NewGrid(width, height, 0x00),
+		grid:    NewGrid(width, height, 0x00),
+		playing: false,
 	}
 }
 
@@ -47,22 +59,57 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tickMsg:
+		if !m.playing || len(m.files) == 0 {
+			return m, nil
+		}
+
+		m.frame = (m.frame + 1) % len(m.files)
+
+		file := ReadImgFromFile(m.files[m.frame])
+		img := ParseImage(file)
+		m.grid = NewGrid(width, height, 0x00)
+		m.grid.DrawImage(img)
+
+		return m, tick()
+
 	case tea.KeyMsg:
 		switch msg.String() {
+		case " ":
+			m.playing = !m.playing
+
+			if m.playing {
+				return m, tick()
+			}
+
+		case "t":
+			files, err := LoadDirectory("frames/spin")
+			if err != nil {
+				return m, nil
+			}
+
+			m.directory = "frames/spin"
+			m.files = files
+			m.frame = 0
+
+			file := ReadImgFromFile(m.files[m.frame])
+			img := ParseImage(file)
+			m.grid.DrawImage(img)
+
 		case "r":
-			m.frame = 1
+			m.frame = 0
 
 		case "right":
-			frameCountStr := strconv.Itoa(m.frame)
+			frameCountStr := strconv.Itoa(m.frame + 1)
 			file := ReadImgFromFile("frames/spin/frame_00" + frameCountStr + ".txt")
 
 			img := ParseImage(file)
 			m.grid.DrawImage(img)
 
-			if m.frame < 6 {
+			if m.frame < 5 {
 				m.frame++
-			} else if m.frame >= 6 {
-				m.frame = 1
+			} else if m.frame >= 5 {
+				m.frame = 0
 			}
 
 		case "c":

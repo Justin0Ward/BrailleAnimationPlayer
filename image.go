@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
@@ -22,6 +23,27 @@ func ReadImgFromFile(file string) string {
 	}
 
 	return string(data)
+}
+
+func LoadDirectory(path string) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		if strings.HasSuffix(entry.Name(), ".txt") {
+			files = append(files, filepath.Join(path, entry.Name()))
+		}
+	}
+
+	return files, nil
 }
 
 func OldParseImage(data string, width, height int) Image {
